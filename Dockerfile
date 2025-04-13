@@ -28,12 +28,20 @@ RUN apt-get update && apt-get install -y \
 
 # Install SimpleX Chat Desktop
 RUN dpkg -i ${SIMPLEX_PACKAGE} || apt-get -f install -y \
-    && cp /usr/share/applications/simplex-chat-desktop.desktop $HOME/Desktop/ \
-    && chmod +x $HOME/Desktop/simplex-chat-desktop.desktop \
-    && chown 1000:1000 $HOME/Desktop/simplex-chat-desktop.desktop
+    && DESKTOP_FILE=$(find /usr/share/applications -name "*simplex*.desktop" | head -n 1) \
+    && if [ -n "$DESKTOP_FILE" ]; then \
+         cp "$DESKTOP_FILE" $HOME/Desktop/ \
+         && chmod +x $HOME/Desktop/$(basename "$DESKTOP_FILE") \
+         && chown 1000:1000 $HOME/Desktop/$(basename "$DESKTOP_FILE"); \
+       else \
+         echo "No SimpleX desktop file found. Creating a custom one." \
+         && echo "[Desktop Entry]\nName=SimpleX Chat\nExec=/opt/simplex/simplex\nIcon=/opt/simplex/icon.png\nType=Application\nCategories=Network;" > $HOME/Desktop/simplex.desktop \
+         && chmod +x $HOME/Desktop/simplex.desktop \
+         && chown 1000:1000 $HOME/Desktop/simplex.desktop; \
+       fi
 
 # Create startup script to launch SimpleX Chat Desktop
-RUN echo "/usr/bin/desktop_ready && /opt/simplex-chat-desktop/simplex-chat-desktop" > $STARTUPDIR/custom_startup.sh \
+RUN echo "#!/bin/bash\n/usr/bin/desktop_ready\n\n# Find the SimpleX executable\nSIMPLEX_EXEC=\$(find /opt -name \"simplex\" -type f -executable | head -n 1)\n\nif [ -n \"\$SIMPLEX_EXEC\" ]; then\n  \$SIMPLEX_EXEC\nelse\n  echo \"SimpleX executable not found\"\n  exit 1\nfi" > $STARTUPDIR/custom_startup.sh \
     && chmod +x $STARTUPDIR/custom_startup.sh
 
 # Clean up
